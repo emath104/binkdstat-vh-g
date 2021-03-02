@@ -1,6 +1,6 @@
 # binkdstat-vh-g
 binkdstat - binkd statistic generator v$ver, (c)opyright by val khokhlov
-            adopted to new year front by Stas Degteff
+            (c) Stas Degteff
 
     binkdstat [-l <log>] [-s <start>|- <period>|-] [-g <day>] [-b]
        -l <log>, --log=<log>                           use binkd.log <log>

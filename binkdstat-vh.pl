@@ -1,8 +1,8 @@
 #!/usr/bin/perl
-$ver="1.22";
+$ver="1.23";
 $usage = <<EOL
 binkdstat - binkd statistic generator v$ver, (c)opyright by val khokhlov
-            adopted to new year front by Stas Degteff
+            (c) Stas Degteff
 
     binkdstat [-l <log>] [-s <start>|- <period>|-] [-g <day>] [-b]
        -l <log>, --log=<log>                           use binkd.log <log>
@@ -444,6 +444,11 @@ if ($bad) {
 }
 
 $upt = `uptime`;
-$upt =~ s/.*up ([0-9].*), [0-9]+ user.*/$1/;
 
-print "\n\n--- binkdstat-vh v$ver.  Node uptime: $upt";
+if( $^O eq "MSWin32" ){ 
+  $upt =~ s/.*up for: +([0-9].*)\n?$/$1/;
+}else{ # *nix
+  $upt =~ s/.*up ([0-9].*), [0-9]+ user.*/$1/;
+}
+
+print "\n\n--- binkdstat-vh v$ver. System uptime: $upt";
