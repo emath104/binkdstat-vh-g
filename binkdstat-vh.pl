@@ -92,10 +92,16 @@ my $trsh = 30*60; # treshold
       my ($ip) = /\(([^)]+)/o;
       $incoming{$ip} = 1;
     }
+    elsif ($cmd =~ /^incoming session with/o && $dt <= $dt_finish) {
+      my ($ip) = /\(([^)]+)/o;
+      $incoming{$ip} = 1;
+      $data{$pid}{'stdt'} = $dt;
+    }
     elsif ($cmd =~ /^call to/o) {
       my ($addr) = $cmd =~ /^call to ([^\@\s]+)/o;
       $addr =~ s/\.0+$//o;
       $node{$addr}{'call'}++;
+      $data{$pid}{'stdt'} = $dt;
     }
     # assure defined $data{$pid}
     elsif (!defined $data{$pid}) { next; }
