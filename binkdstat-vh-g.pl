@@ -4,6 +4,7 @@ $max = 2;
 $stat1, $stat2, $graph1, $graph2, $bad, $log;
 $usage = <<EOL
 binkdstat - binkd statistic generator v1.21, (c)opyright by val khokhlov
+            updated by Stas Degteff 2:5080/102@fidonet
 
     binkdstat [-l <log>] [-s <start>|- <period>|-] [-g <day>] [-b]
        -l <log>, --log=<log>                           use binkd.log <log>
@@ -433,3 +434,8 @@ print "\n"; print join "\n", out_summary(\%node); print "\n";
 if ($bad) {
   print "\n"; print join "\n", out_bad(\%bads); print "\n";
 }
+
+$upt = `uptime`;
+$upt =~ s/.*up ([0-9].*), [0-9]+ user.*/$1/;
+
+print "\n\n--- binkdstat-vh v1.21.  Node uptime: $upt";
