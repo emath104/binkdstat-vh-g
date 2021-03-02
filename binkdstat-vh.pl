@@ -1,6 +1,9 @@
 #!/usr/bin/perl
-$ver="1.24";
+$ver="1.25";
 $history = <<EOH
+Version 1.25
+  Don't print bad-events table if failures isn't found.
+  Don't print time range for bad-events table.
 Version 1.24
   Fix uptime string in Windows and Linux. Don't output uptime string if uptime program isn't exists.
   Fix locale (LC_TIME) problem for ActivePerl: Perl locale is CP1251, not CP866.
@@ -335,6 +338,12 @@ sub put_bad {
 # bad list
 sub out_bad {
   my (@out, @outc, $s);
+  if ($#bad == -1){
+    @out = (
+      'Session failures and problems is not detected.'
+    );
+    return @out;
+  }
   @bad = sort { $b->[0] <=> $a->[0] } @bad;
   for my $elem (@bad) {
     my ($cnt, $ip, $addr, $reason) = @$elem;
@@ -345,7 +354,8 @@ sub out_bad {
   }
   my @hdr = (
     'Session failures and problems',
-    '('.strftime($strftimeformat, localtime $stat1)." - ".strftime($strftimeformat, localtime $stat2).')',
+#    '('.strftime($strftimeformat, localtime $stat1)." - ".strftime($strftimeformat, localtime $stat2).')',
+    '',
     'É'.('Í'x4).'Ñ'.('Í'x16).'Ñ'.('Í'x16).'Ñ'.('Í'x36).'»',
     'º ## ³   IP address   ³    Address     ³           Reason                   º',
     'Ç'.('Ä'x4).'Å'.('Ä'x16).'Å'.('Ä'x16).'Å'.('Ä'x36).'¶'
