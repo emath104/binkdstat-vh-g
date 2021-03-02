@@ -1,5 +1,17 @@
 #!/usr/bin/perl
-$ver="1.23";
+$ver="1.24";
+$history = <<EOH
+Version 1.24
+  Fix uptime string in Windows and Linux. Don't output uptime string if uptime program isn't exists.
+  Fix locale (LC_TIME) problem for ActivePerl: Perl locale is CP1251, not CP866.
+Version 1.23
+  Add system uptime into tearline.
+Version 1.22
+  Sorry. I forgets this information.
+Version 1.21
+  Original version by Val Khokhlov
+EOH
+;
 $usage = <<EOL
 binkdstat - binkd statistic generator v$ver, (c)opyright by val khokhlov
             (c) Stas Degteff
@@ -26,9 +38,19 @@ binkdstat - binkd statistic generator v$ver, (c)opyright by val khokhlov
 EOL
 ;
 # --------------------------------------------------------------------
-use POSIX qw(mktime strftime);
+use POSIX qw(mktime strftime setlocale);
 $max = 2;
 $stat1, $stat2, $graph1, $graph2, $bad, $log;
+$strtimeformat="%a, %d %b %H:%M:%S";
+
+my $lc_time=setlocale("LC_TIME");
+if( ($lc_time =~ /^ru_RU/) && ($lc_time !~ /866$/) ){
+  $strftimeformat="%x %X";
+}else{
+  $strftimeformat="%a, %d %b %H:%M:%S";
+}
+undef $lc_time;
+
 # --------------------------------------------------------------------
 # parse binkd log: parse_log($dt_start, $dt_finish)
 sub parse_log {
@@ -216,7 +238,7 @@ sub out_summary {
   # hdr
   my @hdr = (
     'Summary link statistics',
-    '('.strftime("%a, %d %b %H:%M:%S", localtime $stat1)." - ".strftime("%a, %d %b %H:%M:%S", localtime $stat2).')',
+    '('.strftime($strftimeformat, localtime $stat1)." - ".strftime($strftimeformat, localtime $stat2).')',
     '',
     " ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ Password: '*' - Present, ' ' - Absent, '?' - Error",
     " ³                    Ú Last Session Result: 'ú' - Success, '' - Aborted",
@@ -225,6 +247,7 @@ sub out_summary {
     'º  ok err call ok err³                ³  Online  ³received  sent  ³Xfer³Efctº',
     'Ç'.('Ä'x20).'Å'.('Ä'x16).'Å'.('Ä'x10).'Å'.('Ä'x16).'Å'.('Ä'x4).'Å'.('Ä'x4).'¶'
   );
+
   $hdr[0] = (' 'x(39-length($hdr[0])/2)).$hdr[0];
   $hdr[1] = (' 'x(39-length($hdr[0])/2)).$hdr[1];
   splice @out, 0, 0, @hdr;
@@ -293,7 +316,7 @@ my ($title, @traf) = @_;
     $out[$l++] .= " ÀÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÙ";
   }
   # hdr
-  my $s = 'Station busy graph for '.strftime("%a, %d %b %Y", localtime $graph1);
+  my $s = 'Station busy graph for '.strftime($strftimeformat, localtime $graph1);
   $s = (' 'x(6+24-length($s)/2)).$s;
   splice @out, 0, 0, ($s, '');
   return @out;
@@ -322,7 +345,7 @@ sub out_bad {
   }
   my @hdr = (
     'Session failures and problems',
-    '('.strftime("%a, %d %b %H:%M:%S", localtime $stat1)." - ".strftime("%a, %d %b %H:%M:%S", localtime $stat2).')',
+    '('.strftime($strftimeformat, localtime $stat1)." - ".strftime($strftimeformat, localtime $stat2).')',
     'É'.('Í'x4).'Ñ'.('Í'x16).'Ñ'.('Í'x16).'Ñ'.('Í'x36).'»',
     'º ## ³   IP address   ³    Address     ³           Reason                   º',
     'Ç'.('Ä'x4).'Å'.('Ä'x16).'Å'.('Ä'x16).'Å'.('Ä'x36).'¶'
@@ -445,10 +468,13 @@ if ($bad) {
 
 $upt = `uptime`;
 
-if( $^O eq "MSWin32" ){ 
-  $upt =~ s/.*up for: +([0-9].*)\n?$/$1/;
-}else{ # *nix
-  $upt =~ s/.*up ([0-9].*), [0-9]+ user.*/$1/;
+if( length($upt)>0 ){
+  if( $^O eq "MSWin32" ){ # ActivePerl on Windows
+    $upt =~ s/.*up for: +([0-9].*)\n?$/$1/;
+  }else{ # *nix
+    $upt =~ s/.*up +([0-9].*), +[0-9]+ user.*/$1/;
+  }
+  $upt=" System uptime: ".$upt;
 }
 
-print "\n\n--- binkdstat-vh v$ver. System uptime: $upt";
+print "\n\n--- binkdstat-vh v$ver.$upt";
