@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-$ver="1.25";
+$ver="1.25-m1";
 $history = <<EOH
 Version 1.25
   Don't print bad-events table if failures isn't found.
@@ -85,7 +85,8 @@ my $trsh = 30*60; # treshold
     if ($cmd =~ /^session with/o && $dt <= $dt_finish) {
       my ($ip) = /\(([^)]+)/o;
       $data{$pid}{'sthh'} = $h*2 + ($m > 29);
-      $data{$pid}{'ip'} = $ip; $data{$pid}{'stdt'} = $dt;
+      $data{$pid}{'ip'} = $ip; 
+      $data{$pid}{'stdt'} = $dt;
       $cur++;
     }
     elsif ($cmd =~ /^incoming from/o && $dt <= $dt_finish) {
@@ -95,12 +96,14 @@ my $trsh = 30*60; # treshold
     elsif ($cmd =~ /^incoming session with/o && $dt <= $dt_finish) {
       my ($ip) = /\(([^)]+)/o;
       $incoming{$ip} = 1;
+#      $data{$pid}{'ip'} = $ip unless defined $data{$pid}{'ip'};
       $data{$pid}{'stdt'} = $dt;
     }
     elsif ($cmd =~ /^call to/o) {
       my ($addr) = $cmd =~ /^call to ([^\@\s]+)/o;
       $addr =~ s/\.0+$//o;
       $node{$addr}{'call'}++;
+#      $data{$pid}{'addr'} = $addr unless defined $data{$pid}{'addr'};
       $data{$pid}{'stdt'} = $dt;
     }
     # assure defined $data{$pid}
@@ -221,7 +224,7 @@ sub out_summary {
     $last = $rec->{'last'} ? 'ú' : '';
     if ($rec->{'sec'} > 0) { $cps = ($rec->{'rb'}+$rec->{'sb'}) / $rec->{'sec'}; }
     if ($rec->{'xcps'}) { $rec->{'xcps'} /= $rec->{'rb'}+$rec->{'sb'}; }
-    $s = sprintf "º%s%3d %3d %3d %3d %3d³%s%-15s³%4d:%02d:%02d³%s³%s³%sº",
+    $s = sprintf "º%s%4d %3d %4d %4d %3d³%s%-15s³%4d:%02d:%02d³%s³%s³%sº",
                  $pwd,
                  $rec->{'from_OK'}, $rec->{'from_failed'}, $rec->{'call'}, $rec->{'to_OK'}, $rec->{'to_failed'},
                  $last, ($addr||'failure'), $hours, $mins, $secs,
@@ -249,30 +252,30 @@ sub out_summary {
     'Summary link statistics',
     '('.strftime($strftimeformat, localtime $stat1)." - ".strftime($strftimeformat, localtime $stat2).')',
     '',
-    " ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ Password: '*' - Present, ' ' - Absent, '?' - Error",
-    " ³                    Ú Last Session Result: 'ú' - Success, '' - Aborted",
-    'É'.('Í'x20).'Ñ'.('Í'x16).'Ñ'.('Í'x10).'Ñ'.('Í'x16).'Ñ'.('Í'x9).'»',
-    'ºP   In       Out    ³L    Address    ³   Time   ³  Bytes  Bytes  ³   CPS   º',
-    'º  ok err call ok err³                ³  Online  ³received  sent  ³Xfer³Efctº',
-    'Ç'.('Ä'x20).'Å'.('Ä'x16).'Å'.('Ä'x10).'Å'.('Ä'x16).'Å'.('Ä'x4).'Å'.('Ä'x4).'¶'
+    " ÚÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄÄ Password: '*' - Present, ' ' - Absent, '?' - Error",
+    " ³                       Ú Last Session Result: 'ú' - Success, '' - Aborted",
+    'É'.('Í'x23).'Ñ'.('Í'x16).'Ñ'.('Í'x10).'Ñ'.('Í'x16).'Ñ'.('Í'x9).'»',
+    'ºP  In       Out        ³L    Address    ³   Time   ³  Bytes  Bytes  ³   CPS   º',
+    'º   ok err call   ok err³                ³  Online  ³received  sent  ³Xfer³Efctº',
+    'Ç'.('Ä'x23).'Å'.('Ä'x16).'Å'.('Ä'x10).'Å'.('Ä'x16).'Å'.('Ä'x4).'Å'.('Ä'x4).'¶'
   );
 
   $hdr[0] = (' 'x(39-length($hdr[0])/2)).$hdr[0];
   $hdr[1] = (' 'x(39-length($hdr[0])/2)).$hdr[1];
   splice @out, 0, 0, @hdr;
   # totals
-  push @out, 'Ç'.('Ä'x20).'Å'.('Ä'x16).'Å'.('Ä'x10).'Å'.('Ä'x16).'Å'.('Ä'x4).'Å'.('Ä'x4).'¶';
+  push @out, 'Ç'.('Ä'x23).'Å'.('Ä'x16).'Å'.('Ä'x10).'Å'.('Ä'x16).'Å'.('Ä'x4).'Å'.('Ä'x4).'¶';
   my $secs = $tot{'sec'} % 60;
   my $mins = int($tot{'sec'} / 60) % 60;
   my $hours = int($tot{'sec'} / 60 / 60);
   my $cps = 0;
   if ($tot{'sec'} > 0) { $cps = ($tot{'rb'}+$tot{'sb'}) / $tot{'sec'}; }
   if ($tot{'sb'}+$tot{'rb'} > 0) { $xcps /= $tot{'sb'} + $tot{'rb'}; } else { $xcps = 0; }
-  push @out, sprintf "º %3d %3d %3d %3d %3d³ Stations: %4d ³%4d:%02d:%02d³%s³%s³%sº",
+  push @out, sprintf "º %4d %3d %4d %4d %3d³ Stations: %4d ³%4d:%02d:%02d³%s³%s³%sº",
                  $tot{'from_OK'}, $tot{'from_failed'}, $tot{'call'}, $tot{'to_OK'}, $tot{'to_failed'},
                  $n, $hours, $mins, $secs,
                  traf2str($tot{'rb'}, $tot{'sb'}), cps2str($xcps), cps2str($cps);
-  push @out, 'È'.('Í'x20).'Ï'.('Í'x16).'Ï'.('Í'x10).'Ï'.('Í'x16).'Ï'.('Í'x4).'Ï'.('Í'x4).'¼';
+  push @out, 'È'.('Í'x23).'Ï'.('Í'x16).'Ï'.('Í'x10).'Ï'.('Í'x16).'Ï'.('Í'x4).'Ï'.('Í'x4).'¼';
   return @out;
 }
 # --------------------------------------------------------------------
@@ -356,20 +359,21 @@ sub out_bad {
     $addr = '?' if $addr eq '';
     $reason = 'unknown' if $reason eq '';
     if (length $reason > 36) { substr $reason, 33, length($reason)-33, '...'; }
-    push @out, sprintf "º%4d³ %15s³ %-15s³%-36sº", $cnt, $ip, $addr, $reason;
+    if (length $addr > 15) { substr $addr, 14, length($addr)-14, '+'; }
+    push @out, sprintf "º%4d³ %17s³ %-15s³%-37sº", $cnt, $ip, $addr, $reason;
   }
   my @hdr = (
     'Session failures and problems',
 #    '('.strftime($strftimeformat, localtime $stat1)." - ".strftime($strftimeformat, localtime $stat2).')',
     '',
-    'É'.('Í'x4).'Ñ'.('Í'x16).'Ñ'.('Í'x16).'Ñ'.('Í'x36).'»',
-    'º ## ³   IP address   ³    Address     ³           Reason                   º',
-    'Ç'.('Ä'x4).'Å'.('Ä'x16).'Å'.('Ä'x16).'Å'.('Ä'x36).'¶'
+    'É'.('Í'x4).'Ñ'.('Í'x18).'Ñ'.('Í'x16).'Ñ'.('Í'x37).'»',
+    'º ## ³    IP address    ³    Address     ³            Reason                   º',
+    'Ç'.('Ä'x4).'Å'.('Ä'x18).'Å'.('Ä'x16).'Å'.('Ä'x37).'¶'
   );
   $hdr[0] = (' 'x(39-length($hdr[0])/2)).$hdr[0];
   $hdr[1] = (' 'x(39-length($hdr[0])/2)).$hdr[1];
   splice @out, 0, 0, @hdr;
-  push @out, 'È'.('Í'x4).'Ï'.('Í'x16).'Ï'.('Í'x16).'Ï'.('Í'x36).'¼';
+  push @out, 'È'.('Í'x4).'Ï'.('Í'x18).'Ï'.('Í'x16).'Ï'.('Í'x37).'¼';
   return @out;
 }
 # --------------------------------------------------------------------
