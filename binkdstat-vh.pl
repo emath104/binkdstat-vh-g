@@ -1,10 +1,8 @@
 #!/usr/bin/perl
-use POSIX qw(mktime strftime);
-$max = 2;
-$stat1, $stat2, $graph1, $graph2, $bad, $log;
+$ver="1.22";
 $usage = <<EOL
-binkdstat - binkd statistic generator v1.21, (c)opyright by val khokhlov
-            updated by Stas Degteff 2:5080/102@fidonet
+binkdstat - binkd statistic generator v$ver, (c)opyright by val khokhlov
+            adopted to new year front by Stas Degteff
 
     binkdstat [-l <log>] [-s <start>|- <period>|-] [-g <day>] [-b]
        -l <log>, --log=<log>                           use binkd.log <log>
@@ -28,6 +26,10 @@ binkdstat - binkd statistic generator v1.21, (c)opyright by val khokhlov
 EOL
 ;
 # --------------------------------------------------------------------
+use POSIX qw(mktime strftime);
+$max = 2;
+$stat1, $stat2, $graph1, $graph2, $bad, $log;
+# --------------------------------------------------------------------
 # parse binkd log: parse_log($dt_start, $dt_finish)
 sub parse_log {
 my %MON = (Jan=>0, Feb=>1, Mar=>2, Apr=>3, May=>4, Jun=>5, Jul=>6, Aug=>7, Sep=>8, Oct=>9, Nov=>10, Dec=>11);
@@ -36,28 +38,34 @@ my $trsh = 30*60; # treshold
   my $YEAR = (localtime)[5];
   $dt_start = 0 if !defined $dt_start;
   $dt_finish = 0x7fffffff if !defined $dt_finish;
-  my %data; my $found = 0; my $cur = 0;
   if (defined $log) {
     open F, $log or die "fatal: can't open log file $log";
   } else { *F = *STDIN; }
+  my %data; my $found = 0; my $cur = 0;
+  my $ffound = 0;
   while (<F>) {
     study $_;
     my ($day, $mon, $h, $m, $s, $pid, $cmd) = /^..(..).(...).(..):(..):(..).\[(\d+)\].(.*)/ or next;
     my $dt = mktime($s, $m, $h, $day, $MON{$mon}, $YEAR);
     if ($dt_start == 0 && !defined $stat1) { $stat1 = $dt; }
     if ($dt_finish == 0x7fffffff) { $stat2 = $dt; }
-    next if ($dt < $dt_start-$trsh);
-    last if ($dt > $dt_finish && $cur <= 0);
+    if ($dt < $dt_start-$trsh) {
+      $ffound = -1;
+      next;
+    }
+    last if ($dt > $dt_finish && $ffound == -1 );
+#    next if ($dt < $dt_start-$trsh);
+#    last if ($dt > $dt_finish && $cur <= 0);
     study $cmd;
-    if ($cmd =~ /^session with/o && $dt <= $dt_finish) { 
+    if ($cmd =~ /^session with/o && $dt <= $dt_finish) {
       my ($ip) = /\(([^)]+)/o;
       $data{$pid}{'sthh'} = $h*2 + ($m > 29);
       $data{$pid}{'ip'} = $ip; $data{$pid}{'stdt'} = $dt;
-      $cur++; 
+      $cur++;
     }
-    elsif ($cmd =~ /^incoming from/o && $dt <= $dt_finish) { 
+    elsif ($cmd =~ /^incoming from/o && $dt <= $dt_finish) {
       my ($ip) = /\(([^)]+)/o;
-      $incoming{$ip} = 1; 
+      $incoming{$ip} = 1;
     }
     elsif ($cmd =~ /^call to/o) {
       my ($addr) = $cmd =~ /^call to ([^\@\s]+)/o;
@@ -75,14 +83,14 @@ my $trsh = 30*60; # treshold
     elsif ($dt >= $dt_start && $cmd =~ /^done/o) {
       my ($cmd2, $st, $sf, $rf, $sb, $rb) = $cmd =~ /^done \(([^,]+), (\S+), S\/R: (\d+)\/(\d+) \((\d+)\/(\d+)/o;
       my ($dir, $addr) = $cmd2 =~ /(to|from) ([^\@\s]+)\S*/o;
-      if ($dir ne 'from' && $dir ne 'to' 
+      if ($dir ne 'from' && $dir ne 'to'
           && $incoming{ $data{$pid}{'ip'} }) { $dir = 'from'; }
       if ($st ne 'OK') { $st = 'failed'; }
       $addr =~ s/\.0+$//o;
       my $w = $h*2 + ($m > 29);
       if ($data{$pid}{'stdt'} < $graph2 && $dt > $graph1) {
-        put_traf($data{$pid}{'stdt'} < $graph1 ? 0 : $data{$pid}{'sthh'}, 
-                 $dt > $graph2 ? 0 : $w, 
+        put_traf($data{$pid}{'stdt'} < $graph1 ? 0 : $data{$pid}{'sthh'},
+                 $dt > $graph2 ? 0 : $w,
                  $sb, $rb, $data{$pid}{'pwd'} ? (\@out, \@in) : (\@out2, \@in2));
       }
       $node{$addr}{'sb'} += $sb; $node{$addr}{'rb'} += $rb;
@@ -92,10 +100,10 @@ my $trsh = 30*60; # treshold
       $node{$addr}{"${dir}_${st}"}++;
       if ($sb+$rb > 0) { $node{$addr}{'xcps'} += $data{$pid}{'xcps'}; }
       if ($st eq 'failed' && !$data{$pid}{'bad'}) {
-        put_bad(\@bad, $data{$pid}{'ip'}, $addr, 
+        put_bad(\@bad, $data{$pid}{'ip'}, $addr,
                 defined $addr ? 'unknown' : 'connection failure');
       }
-      undef $data{$pid}; $cur--; 
+      undef $data{$pid}; $cur--;
     }
     elsif ($cmd =~ /^addr/) {
       my ($addr, $st) = $cmd =~ /^addr: ([^\@\s]+)[^(]*(\([^)]+)?/o;
@@ -182,11 +190,11 @@ sub out_summary {
     $last = $rec->{'last'} ? 'ú' : '';
     if ($rec->{'sec'} > 0) { $cps = ($rec->{'rb'}+$rec->{'sb'}) / $rec->{'sec'}; }
     if ($rec->{'xcps'}) { $rec->{'xcps'} /= $rec->{'rb'}+$rec->{'sb'}; }
-    $s = sprintf "º%s%3d %3d %3d %3d %3d³%s%-15s³%4d:%02d:%02d³%s³%s³%sº", 
+    $s = sprintf "º%s%3d %3d %3d %3d %3d³%s%-15s³%4d:%02d:%02d³%s³%s³%sº",
                  $pwd,
                  $rec->{'from_OK'}, $rec->{'from_failed'}, $rec->{'call'}, $rec->{'to_OK'}, $rec->{'to_failed'},
                  $last, ($addr||'failure'), $hours, $mins, $secs,
-                 traf2str($rec->{'rb'}, $rec->{'sb'}), 
+                 traf2str($rec->{'rb'}, $rec->{'sb'}),
                  cps2str($rec->{'xcps'}), cps2str($cps);
     if ($rec->{'xcps'} > 0) { $xcps += $rec->{'xcps'}*($rec->{'sb'}+$rec->{'rb'}); }
     # insert into sorted out
@@ -228,7 +236,7 @@ sub out_summary {
   my $cps = 0;
   if ($tot{'sec'} > 0) { $cps = ($tot{'rb'}+$tot{'sb'}) / $tot{'sec'}; }
   if ($tot{'sb'}+$tot{'rb'} > 0) { $xcps /= $tot{'sb'} + $tot{'rb'}; } else { $xcps = 0; }
-  push @out, sprintf "º %3d %3d %3d %3d %3d³ Stations: %4d ³%4d:%02d:%02d³%s³%s³%sº", 
+  push @out, sprintf "º %3d %3d %3d %3d %3d³ Stations: %4d ³%4d:%02d:%02d³%s³%s³%sº",
                  $tot{'from_OK'}, $tot{'from_failed'}, $tot{'call'}, $tot{'to_OK'}, $tot{'to_failed'},
                  $n, $hours, $mins, $secs,
                  traf2str($tot{'rb'}, $tot{'sb'}), cps2str($xcps), cps2str($cps);
@@ -242,7 +250,7 @@ sub put_traf {
   my ($sthh, $ehh, $sb, $rb, $out, $in) = @_;
   $ehh += 48 if ($ehh < $sthh);
   my $n = $ehh - $sthh;
-  for (my $i = 0; $i <= $n; $i++) { 
+  for (my $i = 0; $i <= $n; $i++) {
     $out->[($sthh+$i) % 48] += $sb/($n+1);
     $in->[($sthh+$i) % 48]  += $rb/($n+1);
   }
@@ -257,7 +265,7 @@ my (@out, $l, $h, $i);
 my ($title, @traf) = @_;
   # graph
   for ($l = 15; $l >= 0; $l--) {
-    if (($l+1) % 4 == 0) { $out[15-$l] = sprintf "%3.1fk ´", ($l+1)*$max/16; } 
+    if (($l+1) % 4 == 0) { $out[15-$l] = sprintf "%3.1fk ´", ($l+1)*$max/16; }
       else { $out[15-$l] = "     ³"; }
     for ($h = 0; $h < 48; $h++) {
       my $c = 0;
@@ -269,7 +277,7 @@ my ($title, @traf) = @_;
     }
   }
   $out[16] = "   0 Å".("ÄÂ"x24);
-  $out[17] = "     "; for (my $h = 0; $h < 24; $h++) { 
+  $out[17] = "     "; for (my $h = 0; $h < 24; $h++) {
     if ($h < 10) { $out[17] .= $h.' '; } elsif ($h % 2) { $out[17] .= ' '.$h.' '; }
   }
   # table
@@ -337,18 +345,18 @@ sub str2time {
     my @a = $s =~ /^([+-]?)(\d+)([hHdDwWmMyY])?/o or return undef;
     substr $s, 0, length(join '', @a), '';
     $a[2] = 'd' if !defined $a[2];
-    if (lc $a[2] eq 'y') { 
+    if (lc $a[2] eq 'y') {
       if ($a[0] eq '-') { $y -= $a[1]; }
       elsif ($a[0] eq '+') { $y += $a[1]; }
       elsif ($a[1] < 1900) { $y = $a[1]+100; }
       else { $y = $a[1]-1900; }
     }
-    elsif (lc $a[2] eq 'm') { $m = $a[0] eq '-' ? $m-$a[1] : $a[1]-1; 
+    elsif (lc $a[2] eq 'm') { $m = $a[0] eq '-' ? $m-$a[1] : $a[1]-1;
       if ($a[0] eq '-') { $m -= $a[1]; }
       elsif ($a[0] eq '+') { $m += $a[1]; }
       else { $m = $a[1] - 1; }
     }
-    elsif (lc $a[2] eq 'w') { 
+    elsif (lc $a[2] eq 'w') {
       if ($a[0] eq '-') { $d -= $w+7*$a[1]-1; $w = 1; }
       elsif ($a[0] eq '+') { $d += 7*$a[1]-$w+1; $w = 1; }
       else { return undef; }
@@ -358,7 +366,7 @@ sub str2time {
       elsif ($a[0] eq '+') { $d += $a[1]; }
       else { $d = $a[1]; }
     }
-    elsif (lc $a[2] eq 'h') { 
+    elsif (lc $a[2] eq 'h') {
       if ($a[0] eq '-') { $h -= $a[1]; }
       elsif ($a[0] eq '+') { $h += $a[1]; }
       else { $h = $a[1]; }
@@ -380,7 +388,7 @@ sub parse_cmdline {
     }
     elsif (/^--stat/o) {
       $i++;
-      ($dts, $dtf) = /^--stat=([^,]+),(.+)$/o 
+      ($dts, $dtf) = /^--stat=([^,]+),(.+)$/o
           or die "use: --stat=<start-time>,<end-time>\n";
     }
     elsif ($_ eq '-g') {
@@ -403,8 +411,8 @@ sub parse_cmdline {
     else { die "unknown parameter: $ARGV[$i]\n"; }
   }
   # init values
-  if (defined $dts && $dts ne '-') { 
-    $stat1 = str2time($dts) or die "wrong format of time: '$dts'\n"; 
+  if (defined $dts && $dts ne '-') {
+    $stat1 = str2time($dts) or die "wrong format of time: '$dts'\n";
   }
   if (defined $dtf && $dtf ne '-') {
     $stat2 = str2time($dtf, $stat1) or die "wrong format of time: '$dtf'\n";
@@ -438,4 +446,4 @@ if ($bad) {
 $upt = `uptime`;
 $upt =~ s/.*up ([0-9].*), [0-9]+ user.*/$1/;
 
-print "\n\n--- binkdstat-vh v1.21.  Node uptime: $upt";
+print "\n\n--- binkdstat-vh v$ver.  Node uptime: $upt";
